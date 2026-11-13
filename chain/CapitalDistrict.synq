@@ -1,0 +1,295 @@
+// Capital District is a two-seat, 12-round board game.
+// All balances use whole practice SNRG in a nonredeemable game ledger.
+// This prototype uses a public movement schedule for repeatable AIVM testing.
+contract CapitalDistrict {
+    players: mapping(UInt256 => Address);
+    positions: mapping(UInt256 => UInt256);
+    balances: mapping(UInt256 => UInt256);
+    debts: mapping(UInt256 => UInt256);
+    assets: mapping(UInt256 => UInt256);
+    prices: mapping(UInt256 => UInt256);
+    baseRents: mapping(UInt256 => UInt256);
+    upgradeCosts: mapping(UInt256 => UInt256);
+    owners: mapping(UInt256 => UInt256);
+    upgrades: mapping(UInt256 => UInt256);
+    phase: UInt256;
+    turns: UInt256;
+    winner: UInt256;
+    dieOne: UInt256;
+    dieTwo: UInt256;
+    upgradedThisTurn: Bool;
+
+    event Joined(seat: UInt256, account: Address);
+    event Rolled(seat: UInt256, first: UInt256, second: UInt256, space: UInt256);
+    event RentPaid(fromSeat: UInt256, toSeat: UInt256, space: UInt256, amount: UInt256);
+    event PropertyBought(seat: UInt256, space: UInt256, price: UInt256);
+    event PropertyUpgraded(seat: UInt256, space: UInt256, level: UInt256);
+    event GameFinished(winningSeat: UInt256);
+
+    constructor() {
+        rejectNativeValue();
+        require(msg.sender != Address(0), "Player account required");
+        players[1] = msg.sender;
+        balances[1] = 1500;
+        addProperty(1, 100, 20, 55);
+        addProperty(2, 130, 25, 70);
+        addProperty(4, 160, 32, 90);
+        addProperty(6, 150, 30, 85);
+        addProperty(7, 185, 38, 105);
+        addProperty(8, 220, 45, 120);
+        addProperty(11, 175, 35, 100);
+        addProperty(12, 215, 43, 120);
+        addProperty(14, 255, 53, 140);
+        addProperty(16, 210, 42, 115);
+        addProperty(17, 260, 55, 145);
+        addProperty(19, 300, 65, 165);
+        emit Joined(1, msg.sender);
+    }
+
+    @public @gas_cost(base: 20000)
+    function join() {
+        rejectNativeValue();
+        require(phase == 0, "Seats are filled");
+        require(msg.sender != Address(0) && msg.sender != players[1], "Second account required");
+        players[2] = msg.sender;
+        balances[2] = 1500;
+        phase = 1;
+        emit Joined(2, msg.sender);
+    }
+
+    @public @gas_cost(base: 40000)
+    function roll() -> UInt256 {
+        require(phase == 1, "Roll unavailable");
+        let seat: UInt256 = actingSeat();
+        let first: Bytes = Bytes("010203020304040201060404030505030302040204020505");
+        let second: Bytes = Bytes("010204020304040201060405030506040403050204030505");
+        dieOne = first[turns];
+        dieTwo = second[turns];
+        let next: UInt256 = positions[seat] + dieOne + dieTwo;
+        if (next >= 20) {
+            credit(seat, 200);
+        }
+        let landed: UInt256 = next % 20;
+        positions[seat] = landed;
+        settleLanding(seat, landed);
+        phase = 2;
+        emit Rolled(seat, dieOne, dieTwo, landed);
+        return landed;
+    }
+
+    @public @gas_cost(base: 30000)
+    function buy() {
+        require(phase == 2, "Roll before buying");
+        let seat: UInt256 = actingSeat();
+        let space: UInt256 = positions[seat];
+        let price: UInt256 = prices[space];
+        require(price > 0 && owners[space] == 0, "Property unavailable");
+        require(balances[seat] >= price, "Insufficient practice SNRG");
+        debit(seat, price);
+        owners[space] = seat;
+        assets[seat] = assets[seat] + price;
+        emit PropertyBought(seat, space, price);
+    }
+
+    @public @gas_cost(base: 30000)
+    function upgrade(space: UInt256) {
+        require(phase == 2 && !upgradedThisTurn, "Upgrade unavailable");
+        let seat: UInt256 = actingSeat();
+        require(space < 20 && owners[space] == seat, "You must own this property");
+        let level: UInt256 = upgrades[space];
+        require(level < 2, "Upgrade limit reached");
+        let cost: UInt256 = upgradeCosts[space];
+        require(balances[seat] >= cost, "Insufficient practice SNRG");
+        debit(seat, cost);
+        upgrades[space] = level + 1;
+        assets[seat] = assets[seat] + cost;
+        upgradedThisTurn = true;
+        emit PropertyUpgraded(seat, space, level + 1);
+    }
+
+    @public @gas_cost(base: 30000)
+    function endTurn() {
+        require(phase == 2, "Roll before ending a turn");
+        actingSeat();
+        turns = turns + 1;
+        upgradedThisTurn = false;
+        phase = 1;
+        if (turns == 24) {
+            phase = 3;
+            // Move opposing debt to each side so scores compare without signed arithmetic.
+            let scoreOne: UInt256 = balances[1] + assets[1] + debts[2];
+            let scoreTwo: UInt256 = balances[2] + assets[2] + debts[1];
+            if (scoreOne > scoreTwo) {
+                winner = 1;
+            }
+            if (scoreTwo > scoreOne) {
+                winner = 2;
+            }
+            emit GameFinished(winner);
+        }
+    }
+
+    // Phases: 0 lobby, 1 roll, 2 act, 3 finished.
+    @public @gas_cost(base: 20000)
+    function gamePhase() -> UInt256 {
+        rejectNativeValue();
+        return phase;
+    }
+
+    @public @gas_cost(base: 20000)
+    function completedTurns() -> UInt256 {
+        rejectNativeValue();
+        return turns;
+    }
+
+    // In phase 3, winner 0 denotes a tie.
+    @public @gas_cost(base: 20000)
+    function winningSeat() -> UInt256 {
+        rejectNativeValue();
+        return winner;
+    }
+
+    // Return both dice as two decimal digits, with 0 before the first roll.
+    @public @gas_cost(base: 20000)
+    function lastRoll() -> UInt256 {
+        rejectNativeValue();
+        return dieOne * 10 + dieTwo;
+    }
+
+    @public @gas_cost(base: 20000)
+    function playerAccount(seat: UInt256) -> Address {
+        validateSeat(seat);
+        return players[seat];
+    }
+
+    @public @gas_cost(base: 20000)
+    function playerPosition(seat: UInt256) -> UInt256 {
+        validateSeat(seat);
+        return positions[seat];
+    }
+
+    @public @gas_cost(base: 20000)
+    function playerCash(seat: UInt256) -> UInt256 {
+        validateSeat(seat);
+        return balances[seat];
+    }
+
+    @public @gas_cost(base: 20000)
+    function playerDebt(seat: UInt256) -> UInt256 {
+        validateSeat(seat);
+        return debts[seat];
+    }
+
+    @public @gas_cost(base: 20000)
+    function playerAssetValue(seat: UInt256) -> UInt256 {
+        validateSeat(seat);
+        return assets[seat];
+    }
+
+    @public @gas_cost(base: 20000)
+    function propertyOwner(space: UInt256) -> UInt256 {
+        validateSpace(space);
+        return owners[space];
+    }
+
+    @public @gas_cost(base: 20000)
+    function propertyLevel(space: UInt256) -> UInt256 {
+        validateSpace(space);
+        return upgrades[space];
+    }
+
+    @public @gas_cost(base: 20000)
+    function propertyPrice(space: UInt256) -> UInt256 {
+        validateSpace(space);
+        return prices[space];
+    }
+
+    @public @gas_cost(base: 20000)
+    function propertyRent(space: UInt256) -> UInt256 {
+        validateSpace(space);
+        return baseRents[space] * (upgrades[space] + 1);
+    }
+
+    @public @gas_cost(base: 20000)
+    function propertyUpgradeCost(space: UInt256) -> UInt256 {
+        validateSpace(space);
+        return upgrades[space] < 2 ? upgradeCosts[space] : 0;
+    }
+
+    function rejectNativeValue() private {
+        require(msg.value == 0, "Practice SNRG only");
+    }
+
+    function validateSeat(seat: UInt256) private {
+        rejectNativeValue();
+        require(seat == 1 || seat == 2, "Invalid player seat");
+    }
+
+    function validateSpace(space: UInt256) private {
+        rejectNativeValue();
+        require(space < 20, "Invalid board space");
+    }
+
+    function actingSeat() private -> UInt256 {
+        rejectNativeValue();
+        let seat: UInt256 = turns % 2 + 1;
+        require(msg.sender == players[seat], "Not your turn");
+        return seat;
+    }
+
+    function settleLanding(seat: UInt256, space: UInt256) private {
+        let owner: UInt256 = owners[space];
+        if (owner > 0 && owner != seat) {
+            let rent: UInt256 = baseRents[space] * (upgrades[space] + 1);
+            debit(seat, rent);
+            credit(owner, rent);
+            emit RentPaid(seat, owner, space, rent);
+        }
+        if (space == 3) {
+            credit(seat, 100);
+        }
+        if (space == 9) {
+            debit(seat, 80);
+        }
+        if (space == 13) {
+            credit(seat, 125);
+        }
+        if (space == 15) {
+            debit(seat, 95);
+        }
+        if (space == 5 || space == 10 || space == 18) {
+            let round: UInt256 = (turns - turns % 2) / 2 + 1;
+            let eventIndex: UInt256 = (round + space) % 4;
+            if (eventIndex == 0) { credit(seat, 100); }
+            if (eventIndex == 1) { debit(seat, 75); }
+            if (eventIndex == 2) { credit(seat, 60); }
+            if (eventIndex == 3) { debit(seat, 45); }
+        }
+    }
+
+    function credit(seat: UInt256, amount: UInt256) private {
+        let debt: UInt256 = debts[seat];
+        if (debt > amount) {
+            debts[seat] = debt - amount;
+        } else {
+            debts[seat] = 0;
+            balances[seat] = balances[seat] + amount - debt;
+        }
+    }
+
+    function debit(seat: UInt256, amount: UInt256) private {
+        let balance: UInt256 = balances[seat];
+        if (balance >= amount) {
+            balances[seat] = balance - amount;
+        } else {
+            balances[seat] = 0;
+            debts[seat] = debts[seat] + amount - balance;
+        }
+    }
+
+    function addProperty(space: UInt256, price: UInt256, rent: UInt256, cost: UInt256) private {
+        prices[space] = price;
+        baseRents[space] = rent;
+        upgradeCosts[space] = cost;
+    }
+}

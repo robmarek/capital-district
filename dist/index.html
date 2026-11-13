@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Capital District is a solo or two-player property and cash-flow strategy game for Synergy Network.">
+  <title>Capital District</title>
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#turn-heading">Skip to turn controls</a>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="./" aria-label="Capital District home">
+        <span class="crest" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Capital District<small>THE PROPERTY STRATEGY GAME</small></span>
+      </a>
+      <div class="top-actions">
+        <button type="button" class="plain-button" id="show-rules"><span aria-hidden="true">ⓘ</span> How to play</button>
+        <button type="button" class="network-button" id="show-network" aria-label="Synergy Testnet"><i class="network-dot" aria-hidden="true"></i> <span><span class="network-brand">Synergy </span>Testnet</span></button>
+      </div>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <h1 id="page-title">The City Board</h1>
+        <p>Buy property, earn rent, and build the city’s most valuable portfolio.</p>
+      </div>
+      <div class="mode"><span aria-hidden="true"></span> <strong id="mode-label">2 PLAYERS</strong> <b>·</b> PRACTICE SNRG</div>
+    </section>
+    <div class="game-layout">
+      <section class="board-column" aria-label="Game board and property details">
+        <div class="board-frame">
+          <div id="board" class="board" aria-label="Twenty board spaces">
+            <div class="city">
+              <div class="city-copy">
+                <div class="city-diamond" aria-hidden="true">◇</div>
+                <p>THE CITY OF</p>
+                <strong>Capital<br>District</strong>
+                <div class="city-ornament" aria-hidden="true"><span></span> ◆ <span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="board-key" aria-label="District colors">
+          <span><i class="harbor"></i>Harbor</span><span><i class="midtown"></i>Midtown</span><span><i class="innovation"></i>Innovation</span><span><i class="heights"></i>Heights</span>
+        </div>
+        <section class="panel detail" id="space-details" aria-live="polite" aria-label="Selected space"></section>
+      </section>
+      <aside class="game-sidebar" aria-label="Match controls">
+        <section class="panel turn-card" aria-labelledby="turn-heading">
+          <div class="panel-header">
+            <span class="eyebrow"><i class="tiny-square"></i> CURRENT TURN</span>
+            <span class="round-tag" id="round-label">ROUND 01 / 12</span>
+          </div>
+          <h2 id="turn-heading" tabindex="-1">Avery’s turn</h2>
+          <p class="turn-message" id="turn-message" aria-live="polite">Roll the dice to move around the city.</p>
+          <div class="dice" id="dice" aria-label="Dice ready"></div>
+          <div id="turn-actions" class="turn-actions"></div>
+          <div class="round-progress" id="round-progress" aria-hidden="true"></div>
+        </section>
+        <section class="panel standings" aria-labelledby="standings-heading">
+          <div class="panel-header"><h2 id="standings-heading">Standings</h2><span class="eyebrow muted-label">NET WORTH</span></div>
+          <div id="players"></div>
+          <button type="button" class="plain-button portfolio-link" id="show-portfolio">View portfolios</button>
+        </section>
+        <section class="panel activity-card" aria-labelledby="activity-heading">
+          <div class="panel-header"><h2 id="activity-heading">Activity</h2></div>
+          <ol id="activity"></ol>
+        </section>
+        <button type="button" class="plain-button restart-button" id="new-game">↻ &nbsp; New game</button>
+      </aside>
+    </div>
+    <footer class="footer"><span>CAPITAL DISTRICT</span><span>Practice SNRG stays in this game.</span></footer>
+  </main>
+  <dialog id="rules-dialog" class="dialog" aria-labelledby="rules-title">
+    <button type="button" class="close-button" aria-label="Close" data-close>×</button>
+    <div class="eyebrow">GAME RULES</div>
+    <h2 id="rules-title">How to play</h2>
+    <ol class="rules-list">
+      <li>Play solo against the computer or share a device with another player. Each starts with 1,500 practice SNRG.</li>
+      <li>Roll two dice to move. Passing City Hall adds 200 SNRG to your practice balance. Market events, grants, fees, and rent resolve when you land.</li>
+      <li>You can buy the property you land on if it’s available. After rolling, you can also upgrade one property you own to increase its rent.</li>
+      <li>After rolling, you can sell one property back to the city for 75% of its asset value, rounded down. The sale clears its upgrades and puts it back on the board.</li>
+      <li>The player with the highest net worth after 12 rounds wins. Net worth includes cash, property purchase prices, and upgrade costs. Fees and rent can take cash below zero.</li>
+    </ol>
+    <button type="button" class="action-button primary" data-close>Back to game</button>
+  </dialog>
+  <dialog id="network-dialog" class="dialog" aria-labelledby="network-title">
+    <button type="button" class="close-button" aria-label="Close" data-close>×</button>
+    <div class="eyebrow">SYNERGY NETWORK</div>
+    <h2 id="network-title">Testnet v3</h2>
+    <p>SNRG is Synergy Network’s native coin. This match uses practice balances on your device. Live SNRG payments are pending public contract support.</p>
+    <dl class="network-detail"><div><dt>Expected chain ID</dt><dd>1266</dd></div><div><dt>Network status</dt><dd id="network-status" aria-live="polite">Ready to check</dd></div></dl>
+    <button type="button" class="action-button primary" id="check-network">Check testnet</button>
+  </dialog>
+  <dialog id="new-dialog" class="dialog" aria-labelledby="new-title">
+    <button type="button" class="close-button" aria-label="Close" data-close>×</button>
+    <div class="eyebrow">LOCAL MATCH</div>
+    <h2 id="new-title">New game</h2>
+    <p>Starting a new game replaces the current match on this device.</p>
+    <form id="new-game-form">
+      <fieldset class="mode-options">
+        <legend>Match type</legend>
+        <label><input type="radio" name="mode" value="local" checked><span>Two players</span></label>
+        <label><input type="radio" name="mode" value="solo"><span>Solo vs computer</span></label>
+      </fieldset>
+      <div class="form-grid">
+        <label for="player-one">Player 1<input id="player-one" name="one" maxlength="24" required value="Avery" autofocus></label>
+        <label for="player-two" id="player-two-label">Player 2<input id="player-two" name="two" maxlength="24" required value="Jordan"></label>
+      </div>
+      <button class="action-button primary" type="submit">Start game</button>
+    </form>
+  </dialog>
+  <dialog id="portfolio-dialog" class="dialog portfolio-dialog" aria-labelledby="portfolio-title">
+    <button type="button" class="close-button" aria-label="Close" data-close>×</button>
+    <h2 id="portfolio-title">Property portfolios</h2>
+    <p id="portfolio-instructions"></p>
+    <div id="portfolio-list"></div>
+  </dialog>
+  <dialog id="sale-dialog" class="dialog" aria-labelledby="sale-title">
+    <h2 id="sale-title">Sell property?</h2>
+    <p id="sale-quote"></p>
+    <div class="sale-actions">
+      <button type="button" class="action-button" data-close autofocus>Keep property</button>
+      <button type="button" class="action-button primary" id="confirm-sale">Sell property</button>
+    </div>
+  </dialog>
+</body>
+</html>
