@@ -1,5 +1,7 @@
 # Capital District
 
+[Play online](https://robmarek.github.io/capital-district/)
+
 Capital District is a property strategy game built for Synergy Network. Buy lots, collect rent, improve properties, and manage cash as city fees and market events hit. After 12 rounds, the portfolio with the highest net worth wins.
 
 ## Play locally
